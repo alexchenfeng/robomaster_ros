@@ -645,9 +645,8 @@ class Camera(robomaster.media.LiveView, Module):  # type: ignore
     def stop_audio_stream(self) -> bool:
         r = super().stop_audio_stream()
         if r:
-            self._audio_publisher_thread = threading.Thread(
-                target=self._audio_publisher_task)
-            self._audio_publisher_thread.start()
+            self._audio_frame_queue.queue.clear()
+            self._audio_publisher_thread.join()
         return r
 
     def _audio_decoder_task(self) -> None:
@@ -657,7 +656,7 @@ class Camera(robomaster.media.LiveView, Module):  # type: ignore
             data = self._audio_stream_conn.read_buf()
             if not data:
                 continue
-            if self.publish_opus_audio:
+            if self.should_publish_audio_opus:
                 msg = robomaster_msgs.msg.AudioOpus(buffer=data)
                 msg.header.stamp = self.clock.now().to_msg()
                 msg.seq = seq
@@ -678,7 +677,7 @@ class Camera(robomaster.media.LiveView, Module):  # type: ignore
             except queue.Empty:
                 continue
             frame = np.frombuffer(frame, np.int16)
-            if self.publish_raw_audio:
+            if self.should_publish_audio_raw:
                 msg = robomaster_msgs.msg.AudioData(data=frame)
                 msg.header.stamp = self.clock.now().to_msg()
                 self.audio_raw_pub.publish(msg)
